@@ -1,0 +1,13 @@
+<ion-view title="{{ title }}">
+    <ion-nav-buttons side="left">
+        <button menu-toggle="left"class="button button-icon icon ion-navicon"></button>
+    </ion-nav-buttons>
+    <ion-content>
+        <div class="list">
+            <a class="item" ng-repeat="(key, article) in articles" ng-class="{'item-stable': article.read==0}" ng-href="#/article/view/{{article.id}}">
+                <h2>{{ article.title }}</h2>
+                <p ng-repeat="(key, tag) in article.tags">{{ tag }}</p>
+            </a>
+        </div>
+    </ion-content>
+</ion-view>

@@ -1,0 +1,13 @@
+<div ng-controller="leftMenuCtrl">
+    <a class="item item-avatar" href="#/article/latest">
+        <img src="img/ionic.png">
+        <h2>Obtao</h2>
+    </a>
+
+    <div class="list">
+        <a class="item" ng-repeat="(key, category) in categories" menu-close ng-href="#/article/byCategory/{{category.id}}">
+            {{ category.name }}
+            <span ng-if="category.unreadArticleCount > 0" class="badge badge-assertive">{{ (category.unreadArticleCount<100)?category.unreadArticleCount:"99+" }}</span>
+        </a>
+    </div>
+</div>
