@@ -5,9 +5,17 @@
     </a>
 
     <div class="list">
-        <a class="item" ng-repeat="(key, category) in categories" menu-close ng-href="#/article/byCategory/{{category.id}}">
-            {{ category.name }}
-            <span ng-if="category.unreadArticleCount > 0" class="badge badge-assertive">{{ (category.unreadArticleCount<100)?category.unreadArticleCount:"99+" }}</span>
+        <a class="item" menu-close ng-href="#/article/unread">
+            Unread
+        </a>
+        <a class="item" menu-close ng-href="#/article/favorites">
+            Favorites
+        </a>
+        <a class="item" menu-close ng-href="#/article/archive">
+            Archive
+        </a>
+        <a class="item" menu-close ng-href="#/article/tags">
+            Tags
         </a>
     </div>
 </div>

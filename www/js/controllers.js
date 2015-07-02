@@ -2,43 +2,97 @@
 
 angular
     .module('rest-ionic-demo.controllers', [])
-    .controller('leftMenuCtrl', [
-        "$scope",
+    .controller('abstractArticleCtrl', function($scope) {
+    })
+    .controller('articleListUnreadCtrl', [
         "$rootScope",
-        "categoryManager",
-        function($scope, $rootScope, categoryManager) {
-            var update = function(event, categories) {
-                $scope.categories = categories;
-            }
-
-            $rootScope.$on('categoriesUpdated', update);
-            categoryManager.getCategories();
-        }
-    ])
-    .controller('abstractArticleCtrl', function($scope) {})
-    .controller('articleListByCategoryCtrl', [
-        "$scope",
-        "$rootScope",
-        "$stateParams",
-        "categoryManager",
-        function($scope, $rootScope, $stateParams, categoryManager) {
-            var categoryId = $stateParams.categoryId;
-            var update = function(event, category) {
-                if (category.id == categoryId) {
-                    $scope.title = category.name;
-                    $scope.articles = category.articles;
-                }
-            }
-
-            $rootScope.$on('categoryUpdated', update);
-            categoryManager.getCategory(categoryId);
-        }
-    ])
-    .controller('articleListLatestCtrl', [
         "$scope",
         "$stateParams",
-        function($scope, $stateParams, Article) {
-            $scope.title = "Latest";
+        "articleManager",
+        function($rootScope, $scope, $stateParams, articleManager) {
+            $scope.title = "Unread";
+            var articlesList = articleManager.getUnreads();
+
+            $scope.loadMore = function() {
+                articlesList.loadMore(function() {
+                    $scope.$broadcast('scroll.infiniteScrollComplete');
+                }, function() {
+                    $scope.$broadcast('scroll.infiniteScrollComplete');
+                });
+            };
+
+            $scope.hasMore = function() {
+                return articlesList.hasMore();
+            }
+
+            var update = function(event, articles) {
+                $scope.articles = articles;
+            }
+
+            $rootScope.$on('unreadArticlesUpdated', update);
+
+        }
+    ])
+    .controller('articleListArchivedCtrl', [
+        "$rootScope",
+        "$scope",
+        "$stateParams",
+        "articleManager",
+        function($rootScope, $scope, $stateParams, articleManager) {
+            $scope.title = "Archive";
+            articleManager.getArchived();
+
+            var update = function(event, articles) {
+                $scope.articles = articles;
+            }
+
+            $rootScope.$on('archiveArticlesUpdated', update);
+
+        }
+    ])
+    .controller('articleListStarredCtrl', [
+        "$rootScope",
+        "$scope",
+        "$stateParams",
+        "articleManager",
+        function($rootScope, $scope, $stateParams, articleManager) {
+            $scope.title = "Favorite";
+            articleManager.getStarred();
+
+            var update = function(event, articles) {
+                $scope.articles = articles;
+            }
+
+            $rootScope.$on('starredArticlesUpdated', update);
+
+        }
+    ])
+    .controller('articleTagListCtrl', [
+        "$rootScope",
+        "$scope",
+        "$stateParams",
+        "tagManager",
+        function($rootScope, $scope, $stateParams, tagManager) {
+            $scope.title = "Tags";
+
+            var updateTags = function(tags) {
+                $scope.tags = tags;
+            }
+
+            tagManager.getTags(updateTags);
+
+            $scope.doRefresh = function() {
+                var reloadEnded = function(){
+                    $scope.$broadcast('scroll.refreshComplete');
+                };
+                tagManager.reloadTags().then(reloadEnded, reloadEnded);
+            };
+
+            $rootScope.$on('tagsUpdated', function(event, tags){
+                console.log("UPDATE");
+                updateTags(tags);
+            });
+
         }
     ])
     .controller('articleViewCtrl', [

@@ -9,11 +9,9 @@
                 <p>{{ article.publishedAt }}</p>
             </div>
             <div class="item item-body">
+                <div ng-bind-html="article.content | trustAsHtml"></div>
                 <p>
-                    {{ article.content }}
-                </p>
-                <p>
-                  <a class="subdued" ng-repeat="(key, tag) in article.tags"> {{ tag }} </a>
+                  <a class="subdued" ng-repeat="(key, tag) in article.tags"> {{ tag.label }} </a>
                 </p>
             </div>
         </div>

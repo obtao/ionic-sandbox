@@ -5,6 +5,24 @@
         <ion-nav-view name="articleContent" animation="slide-left-right"></ion-nav-view>
     </ion-pane>
     <ion-side-menu side="left">
-        <div ng-include src="'templates/leftMenu.html'"></div>
+        <a class="item item-avatar" href="#/article/latest">
+            <img src="img/ionic.png">
+            <h2>Obtao</h2>
+        </a>
+
+        <div class="list">
+            <a class="item" menu-close ng-href="#/article/unread">
+                Unread
+            </a>
+            <a class="item" menu-close ng-href="#/article/favorites">
+                Favorites
+            </a>
+            <a class="item" menu-close ng-href="#/article/archive">
+                Archive
+            </a>
+            <a class="item" menu-close ng-href="#/article/tags">
+                Tags
+            </a>
+        </div>
     </ion-side-menu>
 </ion-side-menus>
