@@ -29,80 +29,80 @@ angular
             var tagManager = this;
 
             function saveTags(tags) {
-                return $q(
-                    function(resolve, reject){
-                        dbTags = [];
-                        tags.forEach(function(tag){
-                            tag['_id'] = tag.id.toString();
-                            dbTags.push(tag);
-                        });
+                var dfd = $q.defer();
 
-                        db.bulkDocs(dbTags).then(function(){
-                            tagManager.getTags().then(resolve, reject);
-                        }, function(err){
-                            reject(err);
-                        });
-                    }
-                )
+                dbTags = [];
+                tags.forEach(function(tag){
+                    tag['_id'] = tag.id.toString();
+                    dbTags.push(tag);
+                });
+
+                db.bulkDocs(dbTags).then(function(){
+                    tagManager.getTags().then(dfd.resolve, dfd.reject);
+                }, function(err){
+                    reject(err);
+                });
+
+                return dfd.promise;
             };
 
             //Load tags from a remote server
             function loadTags() {
-                return $q(
-                    function(resolve, reject){
-                        console.debug("[TAGS] RELOAD FROM SERVER");
-                        $http
-                            .get(couac.generateUrl('tags'))
-                            .success(function(tags) {
-                                saveTags(tags).then(resolve, reject);
-                            })
-                            .error(function(data) {
-                                reject(data);
-                            });
-                    }
-                )
+                var dfd = $q.defer();
+
+                console.debug("[TAGS] RELOAD FROM SERVER");
+                $http
+                    .get(couac.generateUrl('tags'))
+                    .success(function(tags) {
+                        saveTags(tags).then(dfd.resolve, dfd.reject);
+                    })
+                    .error(function(data) {
+                        dfd.reject(data);
+                    });
+
+                return dfd.promise;
             };
 
             //Get tags from cache if any
             this.getTags = function() {
-                return $q(
-                    function(resolve, reject) {
-                        db
-                            .allDocs({include_docs: true})
-                            .then(
-                                function(tags){
-                                    if (tags.total_rows.length != 0) {
-                                        console.debug("[TAGS] GET FROM POUCHDB");
-                                        tags = utils.extractObjects(tags.rows);
-                                        $rootScope.$broadcast('tagsUpdated', tags);
-                                        resolve(tags);
-                                    } else {
-                                        loadTags().then(resolve, reject);
-                                    }
-                                },
-                                function(err){
-                                    tagManager.reloadTags().then(resolve, reject);
-                                }
-                        );
-                    }
+                var dfd = $q.defer();
+
+                db
+                    .allDocs({include_docs: true})
+                    .then(
+                        function(tags){
+                            if (tags.total_rows.length != 0) {
+                                console.debug("[TAGS] GET FROM POUCHDB");
+                                tags = utils.extractObjects(tags.rows);
+                                $rootScope.$broadcast('tagsUpdated', tags);
+                                dfd.resolve(tags);
+                            } else {
+                                loadTags().then(dfd.resolve, dfd.reject);
+                            }
+                        },
+                        function(err){
+                            tagManager.reloadTags().then(dfd.resolve, dfd.reject);
+                        }
                 );
+
+                return dfd.promise;
             };
 
             // Force cache reload
             this.reloadTags = function(){
-                return $q(
-                    function(resolve, reject) {
-                        console.debug("[TAGS] RELOAD TAGS FORCE");
-                        db
-                            .destroy()
-                            .then(
-                                function(){
-                                    db = pouchDB("tags");
-                                    loadTags().then(resolve, reject);
-                                }
-                            );
-                    }
-                );
+                var dfd = $q.defer();
+
+                console.debug("[TAGS] RELOAD TAGS FORCE");
+                db
+                    .destroy()
+                    .then(
+                        function(){
+                            db = pouchDB("tags");
+                            loadTags().then(dfd.resolve, dfd.reject);
+                        }
+                    );
+
+                return dfd.promise;
             };
         }]
     )
