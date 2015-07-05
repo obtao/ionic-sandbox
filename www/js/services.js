@@ -1,8 +1,8 @@
 'use strict;'
 
 angular
-    .module('rest-ionic-demo.services', ['pouchdb','couac'])
-    .service('utils', function(){
+    .module('wallabag.services', [])
+    .service('utils',function($cordovaNetwork){
         this.extractObjects = function(dbObjects) {
             var objects = [];
             if (Array.isArray(dbObjects)) {
@@ -14,8 +14,11 @@ angular
             } else {
                 return dbObjects.doc;
             }
+        };
 
-        }
+        this.hasNetwork = function() {
+            return $cordovaNetwork.isOnline();
+        };
     })
     .service('tagManager',[
         '$rootScope',
@@ -24,7 +27,8 @@ angular
         'couac',
         'utils',
         'pouchDB',
-        function($rootScope, $http, $q, couac, utils, pouchDB){
+        'DBPaginator',
+        function($rootScope, $http, $q, couac, utils, pouchDB, DBPaginator){
             var db = pouchDB("tags");
             var tagManager = this;
 
@@ -50,7 +54,6 @@ angular
             function loadTags() {
                 var dfd = $q.defer();
 
-                console.debug("[TAGS] RELOAD FROM SERVER");
                 $http
                     .get(couac.generateUrl('tags'))
                     .success(function(tags) {
@@ -71,8 +74,7 @@ angular
                     .allDocs({include_docs: true})
                     .then(
                         function(tags){
-                            if (tags.total_rows.length != 0) {
-                                console.debug("[TAGS] GET FROM POUCHDB");
+                            if (tags.total_rows != 0) {
                                 tags = utils.extractObjects(tags.rows);
                                 $rootScope.$broadcast('tagsUpdated', tags);
                                 dfd.resolve(tags);
@@ -92,7 +94,6 @@ angular
             this.reloadTags = function(){
                 var dfd = $q.defer();
 
-                console.debug("[TAGS] RELOAD TAGS FORCE");
                 db
                     .destroy()
                     .then(
@@ -109,53 +110,178 @@ angular
     .service('articleManager',[
         '$rootScope',
         '$http',
+        '$q',
         'couac',
-        function($rootScope, $http, couac) {
-            var unreadPaginatedList;
-            this.getUnreads = function() {
-                if (!unreadPaginatedList) {
-                    unreadPaginatedList = function(){
-                        var items = [], lastResponse;
+        'utils',
+        'pouchDB',
+        'DBPaginator',
+        function($rootScope, $http, $q, couac, utils, pouchDB, DBPaginator){
+            var db = initDb();
+            var articleManager = this;
 
-                        return {
-                            loadMore : function(s, f) {
-                                var url;
-                                if (!lastResponse) {
-                                    url = couac.generateUrl('entries', {}, 'json');
-                                } else {
-                                    url = lastResponse._links.next.href;
-                                }
+            function initDb() {
+                var db = pouchDB("articles");
+                db.createIndex({
+                    index: {
+                      fields: ['is_archived'],
+                      name: "archived"
+                    }
+                });
+                db.createIndex({
+                    index: {
+                      fields: ['id'],
+                      name: "id"
+                    }
+                });
+                db.createIndex({
+                    index: {
+                      fields: ['is_starred'],
+                      name: "starred"
+                    }
+                });
 
-                                $http
-                                    .get(url)
-                                    .success(function(data) {
-                                        lastResponse = data;
-                                        items = items.concat(data._embedded.items);
-                                        $rootScope.$broadcast("unreadArticlesUpdated", items);
-                                        if( typeof s === "function" ) {
-                                            s(items);
-                                        }
-                                    })
-                                    .error(function(data) {
-                                        if( typeof f === "function" ) {
-                                            f(data);
-                                        } else {
-                                            console.error(data);
-                                        }
-                                    });
+                return db;
+            }
 
-                                return this;
-                            },
-                            hasMore : function() {
-                                return lastResponse == undefined || lastResponse.page != lastResponse.pages;
+            function saveServerArticles(articles) {
+                var dfd = $q.defer();
+
+                dbArticles = [];
+                articles.forEach(function(article){
+                    article['_id'] = article.id.toString();
+                    article.href = article['_links'].self.href;
+                    //"_" attributes generates a pouchDB error
+                    delete article['_links'];
+
+                    dbArticles.push(article);
+                });
+
+                db.bulkDocs(dbArticles).then(function(){
+                    dfd.resolve();
+                }, function(err){
+                    console.error("[ARTICLES] Save articles problem", err);
+                    dfd.reject(err);
+                });
+
+                return dfd.promise;
+            };
+
+            //Load articles from a remote server
+            function loadServerArticles(page) {
+                page = page?page:1;
+                var dfd = $q.defer();
+
+                $http
+                    .get(couac.generateUrl('entries', {perPage : 50, page : page}))
+                    .success(function(data) {
+                        saveServerArticles(data['_embedded']['items']).then(function() {
+                            if (page < data['pages']) {
+                                loadServerArticles(++page).then(dfd.resolve, dfd.reject);
+                            } else {
+                                dfd.resolve();
                             }
+                        }, dfd.reject);
+                    })
+                    .error(function(data) {
+                        console.error("[ARTICLES] Load articles problem", err);
+                        dfd.reject(data);
+                    });
+
+                return dfd.promise;
+            };
+
+            //Synchronize articles with server
+            this.synchronize = function() {
+                var dfd = $q.defer();
+
+                console.error("Supprimer ceux qui doivent être supprimés");
+
+                var dfd = $q.defer();
+
+                db
+                    .destroy()
+                    .then(
+                        function(){
+                            db = initDb();
+                            loadServerArticles().then(dfd.resolve, dfd.reject).finally(function() {
+                                $rootScope.$broadcast("articlesSynchronizationEnded");
+                            });
                         }
-                    }();
+                    );
 
+                return dfd.promise;
+            };
 
+            this.deleteArticle = function(article) {
+                var dfd = $q.defer();
+
+                $http
+                    .delete(couac.generateUrl('entries/{idEntry}', {idEntry : article.id}))
+                    .finally(function(){
+                        db.remove(article).then(dfd.resolve, dfd.reject);
+                    });
+
+                return dfd.promise;
+            };
+
+            this.getPaginator = function(paginatorName) {
+                paginatorName = paginatorName.charAt(0).toUpperCase() + paginatorName.slice(1);
+                var methodName = "get" + paginatorName + "Paginator";
+                if (typeof this[methodName] != "function") {
+                    throw "The paginator " + paginatorName + " does not exist"
                 }
 
-                return unreadPaginatedList;
+                var dfd = $q.defer();
+
+                this[methodName]().then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            };
+
+            this.getUnreadsPaginator = function() {
+                var dfd = $q.defer();
+
+                var query = {
+                    selector : {
+                        'is_archived' : false
+                    }
+                };
+                var paginator = new DBPaginator(db, query);
+
+                dfd.resolve(paginator);
+
+                return dfd.promise;
+            };
+
+            this.getArchivedPaginator = function() {
+                var dfd = $q.defer();
+
+                var query = {
+                    selector : {
+                        'is_archived' : true
+                    }
+                };
+                var paginator = new DBPaginator(db, query);
+
+                dfd.resolve(paginator);
+
+                return dfd.promise;
+            };
+
+            this.getStarredPaginator = function() {
+                var dfd = $q.defer();
+
+                var query = {
+                    selector : {
+                        'is_starred' : true
+                    }
+                };
+                var paginator = new DBPaginator(db, query);
+
+                dfd.resolve(paginator);
+
+                return dfd.promise;
             };
         }]
-    );
+    )
+;

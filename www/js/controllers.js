@@ -1,70 +1,79 @@
 'use strict;'
 
 angular
-    .module('rest-ionic-demo.controllers', [])
-    .controller('abstractArticleCtrl', function($scope) {
-    })
-    .controller('articleListUnreadCtrl', [
+    .module('wallabag.controllers', [])
+    .controller('abstractArticleCtrl', [
+        "$scope",
+        "$state",
+        "$ionicLoading",
+        "articleManager",
+        function($scope, $state, $ionicLoading, articleManager) {
+            $scope.synchronize = function() {
+                $ionicLoading.show({
+                    template: 'Loading...'
+                });
+
+                articleManager.synchronize().then(function(data) {
+                    $ionicLoading.hide();
+                    $state.go($state.current, {}, {reload: true});
+                });
+
+            }
+        }
+    ])
+    .controller('articleListCtrl', [
         "$rootScope",
         "$scope",
         "$stateParams",
         "articleManager",
-        function($rootScope, $scope, $stateParams, articleManager) {
-            $scope.title = "Unread";
-            var articlesList = articleManager.getUnreads();
+        "title",
+        "paginatorName",
+        function($rootScope, $scope, $stateParams, articleManager, title, paginatorName) {
+            var paginator, loading;
 
-            $scope.loadMore = function() {
-                articlesList.loadMore(function() {
-                    $scope.$broadcast('scroll.infiniteScrollComplete');
-                }, function() {
-                    $scope.$broadcast('scroll.infiniteScrollComplete');
-                });
+            $scope.title = title;
+            $scope.articles = [];
+            $scope.data = {
+                showDelete : false
             };
 
+            $scope.loadMore = function() {
+                if (!paginator || loading) {
+                    return ;
+                }
+                loading = true;
+
+                paginator
+                    .getNextItems()
+                    .then(function(items){
+                        $scope.articles = $scope.articles.concat(items);
+                    }, function(err){
+                        console.error(err);
+                    })
+                    .finally(function(){
+                        $scope.$broadcast('scroll.infiniteScrollComplete');
+                        loading = false;
+                    })
+            };
+
+            $scope.deleteArticle = function(article) {
+                article.delete = true;
+                articleManager.deleteArticle(article).then(function(){
+                    $scope.articles.splice($scope.articles.indexOf(article), 1);
+                }, function(){
+                    article.delete = false;
+                });
+            }
+
             $scope.hasMore = function() {
-                return articlesList.hasMore();
+                if (!paginator) { return ;}
+
+                return paginator.hasMore();
             }
 
-            var update = function(event, articles) {
-                $scope.articles = articles;
-            }
-
-            $rootScope.$on('unreadArticlesUpdated', update);
-
-        }
-    ])
-    .controller('articleListArchivedCtrl', [
-        "$rootScope",
-        "$scope",
-        "$stateParams",
-        "articleManager",
-        function($rootScope, $scope, $stateParams, articleManager) {
-            $scope.title = "Archive";
-            articleManager.getArchived();
-
-            var update = function(event, articles) {
-                $scope.articles = articles;
-            }
-
-            $rootScope.$on('archiveArticlesUpdated', update);
-
-        }
-    ])
-    .controller('articleListStarredCtrl', [
-        "$rootScope",
-        "$scope",
-        "$stateParams",
-        "articleManager",
-        function($rootScope, $scope, $stateParams, articleManager) {
-            $scope.title = "Favorite";
-            articleManager.getStarred();
-
-            var update = function(event, articles) {
-                $scope.articles = articles;
-            }
-
-            $rootScope.$on('starredArticlesUpdated', update);
-
+            articleManager.getPaginator(paginatorName).then(function(articlePaginator){
+                paginator = articlePaginator;
+            });
         }
     ])
     .controller('articleTagListCtrl', [
@@ -89,7 +98,6 @@ angular
             };
 
             $rootScope.$on('tagsUpdated', function(event, tags){
-                console.log("UPDATE");
                 updateTags(tags);
             });
 

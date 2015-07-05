@@ -1,7 +1,7 @@
 'use strict;'
 
 angular
-    .module('rest-ionic-demo', ['ionic', 'rest-ionic-demo.controllers', 'rest-ionic-demo.services', 'couac', 'pouchdb'])
+    .module('wallabag', ['ionic', 'wallabag.controllers', 'wallabag.services', 'wallabag.factories', 'couac', 'pouchdb', 'ngCordova'])
 
     .run([
         '$ionicPlatform',
@@ -9,11 +9,10 @@ angular
         'wsse',
         function($ionicPlatform, $http, wsse) {
             $ionicPlatform.ready(function() {});
-            var username="admin";
-            var password = wsse.sha1("mypassword" + "admin" + "722e74f446a6d25f0e2e438e77c13c8f");
+            var encryptedPassword = wsse.sha1(AppSettings.password + AppSettings.username + AppSettings.salt);
 
             $http.defaults.headers.common['x-wsse'] = function() {
-                return wsse.getHeaderValue(username, password);
+                return wsse.getHeaderValue(AppSettings.username, encryptedPassword);
             };
             $http.defaults.headers.common.Authorization = 'profile=UsernameToken';
         }
@@ -30,10 +29,15 @@ angular
 
             .state('article.unread', {
                 url: "/unread",
+                cache: false,
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleList.html',
-                        controller: 'articleListUnreadCtrl'
+                        controller: 'articleListCtrl',
+                        resolve : {
+                            title : function() {return "Unread"; },
+                            paginatorName : function() {return "unreads"; }
+                        }
                     }
                 }
             })
@@ -43,7 +47,11 @@ angular
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleList.html',
-                        controller: 'articleListArchivedCtrl'
+                        controller: 'articleListCtrl',
+                        resolve : {
+                            title : function() {return "Archived"; },
+                            paginatorName : function() {return "archived"; }
+                        }
                     }
                 }
             })
@@ -53,7 +61,11 @@ angular
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleList.html',
-                        controller: 'articleListStarredCtrl'
+                        controller: 'articleListCtrl',
+                        resolve : {
+                            title : function() {return "Favorites"; },
+                            paginatorName : function() {return "starred"; }
+                        }
                     }
                 }
             })

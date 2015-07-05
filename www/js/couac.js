@@ -10,9 +10,11 @@ angular
 
             this.generateUrl = function(restEndPoint, params, format) {
                 params = params?params:{};
+                format = format?format:'json';
 
                 var url = baseUrl;
                 url    += restEndPoint;
+                url    += "." + format;
                 var first = true;
 
                 for (key in params) {
