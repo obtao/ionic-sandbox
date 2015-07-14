@@ -25,7 +25,6 @@ angular.module('wallabag.factories', ['pouchdb'])
                     items = [];
                 }
 
-
                 dfd.resolve(items);
 
                 return dfd.promise;
@@ -52,33 +51,15 @@ angular.module('wallabag.factories', ['pouchdb'])
                     dfd.reject("Already loading next page");
                 }
 
-                if (true) {
-                    db
-                        .find(options)
-                        .then(handleResponse)
-                        .then(dfd.resolve, dfd.reject)
-                        .then(function(){
-                            loading = false;
-                        });
-                } else {
-                    db
-                        .allDocs(options)
-                        .then(handleResponse)
-                        .then(dfd.resolve, dfd.reject)
-                        .finally(function(){
-                            loading = false;
-                        });
-                }
+                db
+                    .find(options)
+                    .then(handleResponse)
+                    .then(dfd.resolve, dfd.reject)
+                    .then(function(){
+                        loading = false;
+                    });
 
                 return dfd.promise;
-            }
-
-            DBPaginator.prototype.getItems = function() {
-                if (!initialized) {
-                    throw "Paginator not initialized, use getPage or getNextPage first";
-                }
-
-                return this.items;
             }
 
             DBPaginator.prototype.hasMore = function() {

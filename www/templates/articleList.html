@@ -13,7 +13,11 @@
             <ion-item ng-repeat="(key, article) in articles" ng-class="{'item-stable': article.isRead==0 }" ng-href="#/article/view/{{article.id}}">
                 <h2>{{ article.title }}</h2>
                 <div>{{ article.content | stripTags }}</div>
-                <p ng-repeat="(key, tag) in article.tags">{{ tag.label }}</p>
+                <p ng-if="article.tags.length > 0">
+                    <i class="icon ion-bookmark"></i>
+                    <span ng-repeat="(key, tag) in article.tags"> {{ tag.label }} <span ng-if="!$last">|</span>
+                    </span>
+                </p>
                 <ion-delete-button ng-class="article.delete?'ion-loading-c':'ion-minus-circled'" ng-click="deleteArticle(article)">
                     <ion-spinner ng-hide="!article.delete"></ion-spinner>
                 </ion-delete-button>

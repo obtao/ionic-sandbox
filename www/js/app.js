@@ -44,6 +44,7 @@ angular
 
             .state('article.archived', {
                 url: "/archive",
+                cache: false,
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleList.html',
@@ -58,6 +59,7 @@ angular
 
             .state('article.starred', {
                 url: "/favorites",
+                cache: false,
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleList.html',
@@ -72,6 +74,7 @@ angular
 
             .state('article.tags', {
                 url: "/tags",
+                cache: false,
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/article.tagList.html',
@@ -82,6 +85,7 @@ angular
 
             .state('article.view', {
                 url: '/view/:articleId',
+                cache: false,
                 views: {
                     'articleContent': {
                         templateUrl: 'templates/articleView.html',

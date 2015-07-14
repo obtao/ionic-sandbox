@@ -6,23 +6,28 @@
     </ion-pane>
     <ion-side-menu side="left">
         <a class="item item-avatar" href="#/article/latest">
-            <img src="img/ionic.png">
-            <h2>Obtao</h2>
+            <img src="img/wallabag.png">
+            <h2>Wallabag</h2>
+            <p>Last sync {{ lastSync }}</p>
         </a>
 
-        <div class="list">
-            <a class="item" menu-close ng-href="#/article/unread">
+        <ion-list>
+            <ion-item class="item-icon-left" menu-close ng-href="#/article/unread">
+                <i class="icon ion-flash"></i>
                 Unread
-            </a>
-            <a class="item" menu-close ng-href="#/article/favorites">
+            </ion-item>
+            <ion-item class="item-icon-left" menu-close ng-href="#/article/favorites">
+                <i class="icon ion-star"></i>
                 Favorites
-            </a>
-            <a class="item" menu-close ng-href="#/article/archive">
+            </ion-item>
+            <ion-item class="item-icon-left" menu-close ng-href="#/article/archive">
+                <i class="icon ion-briefcase"></i>
                 Archive
-            </a>
-            <a class="item" menu-close ng-href="#/article/tags">
+            </ion-item>
+            <ion-item class="item-icon-left" menu-close ng-href="#/article/tags">
+                <i class="icon ion-bookmark"></i>
                 Tags
-            </a>
-        </div>
+            </ion-item>
+        </ion-list>
     </ion-side-menu>
 </ion-side-menus>

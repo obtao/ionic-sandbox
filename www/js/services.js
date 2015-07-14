@@ -41,11 +41,10 @@ angular
                     dbTags.push(tag);
                 });
 
-                db.bulkDocs(dbTags).then(function(){
-                    tagManager.getTags().then(dfd.resolve, dfd.reject);
-                }, function(err){
-                    reject(err);
-                });
+                db
+                    .bulkDocs(dbTags)
+                    .then(tagManager.getTags, dfd.reject)
+                    .then(dfd.resolve, dfd.reject);
 
                 return dfd.promise;
             };
@@ -76,7 +75,6 @@ angular
                         function(tags){
                             if (tags.total_rows != 0) {
                                 tags = utils.extractObjects(tags.rows);
-                                $rootScope.$broadcast('tagsUpdated', tags);
                                 dfd.resolve(tags);
                             } else {
                                 loadTags().then(dfd.resolve, dfd.reject);
@@ -115,32 +113,35 @@ angular
         'utils',
         'pouchDB',
         'DBPaginator',
-        function($rootScope, $http, $q, couac, utils, pouchDB, DBPaginator){
-            var db = initDb();
+        'userActionManager',
+        function($rootScope, $http, $q, couac, utils, pouchDB, DBPaginator, userActionManager){
+            var db;
             var articleManager = this;
 
             function initDb() {
-                var db = pouchDB("articles");
-                db.createIndex({
-                    index: {
-                      fields: ['is_archived'],
-                      name: "archived"
-                    }
-                });
-                db.createIndex({
-                    index: {
-                      fields: ['id'],
-                      name: "id"
-                    }
-                });
-                db.createIndex({
-                    index: {
-                      fields: ['is_starred'],
-                      name: "starred"
-                    }
-                });
+                var dfd = $q.defer();
+                var indexes = [
+                    { name : 'archived', fields : ['is_archived'], ddoc: 'archived'},
+                    { name : 'id', fields : ['id'], ddoc: 'id'},
+                    { name : 'starred', fields : ['is_starred'], ddoc: 'starred'},
+                    { name : 'deleted', fields : ['_deleted'], ddoc: 'deleted'}
+                ];
+                var indexesLeft = indexes.length;
+                db = pouchDB("articles");
 
-                return db;
+                function createIndex(index) {
+                    db.createIndex({
+                        index: index
+                    }).then(function() {
+                        if (--indexesLeft == 0) {
+                            dfd.resolve();
+                        }
+                    }, dfd.reject);
+                }
+
+                indexes.forEach(createIndex);
+
+                return dfd.promise;
             }
 
             function saveServerArticles(articles) {
@@ -168,8 +169,8 @@ angular
 
             //Load articles from a remote server
             function loadServerArticles(page) {
-                page = page?page:1;
                 var dfd = $q.defer();
+                page = (page && typeof page != "Object")?page:1;
 
                 $http
                     .get(couac.generateUrl('entries', {perPage : 50, page : page}))
@@ -182,47 +183,25 @@ angular
                             }
                         }, dfd.reject);
                     })
-                    .error(function(data) {
+                    .error(function(err) {
                         console.error("[ARTICLES] Load articles problem", err);
-                        dfd.reject(data);
+                        dfd.reject(err);
                     });
 
                 return dfd.promise;
             };
 
-            //Synchronize articles with server
-            this.synchronize = function() {
-                var dfd = $q.defer();
+            initDb();
 
-                console.error("Supprimer ceux qui doivent être supprimés");
-
-                var dfd = $q.defer();
+            this.getArticle = function(articleId) {
+                var dfd = $q.defer()
 
                 db
-                    .destroy()
-                    .then(
-                        function(){
-                            db = initDb();
-                            loadServerArticles().then(dfd.resolve, dfd.reject).finally(function() {
-                                $rootScope.$broadcast("articlesSynchronizationEnded");
-                            });
-                        }
-                    );
+                    .get(articleId)
+                    .then(dfd.resolve, dfd.reject);
 
                 return dfd.promise;
-            };
-
-            this.deleteArticle = function(article) {
-                var dfd = $q.defer();
-
-                $http
-                    .delete(couac.generateUrl('entries/{idEntry}', {idEntry : article.id}))
-                    .finally(function(){
-                        db.remove(article).then(dfd.resolve, dfd.reject);
-                    });
-
-                return dfd.promise;
-            };
+            }
 
             this.getPaginator = function(paginatorName) {
                 paginatorName = paginatorName.charAt(0).toUpperCase() + paginatorName.slice(1);
@@ -279,6 +258,225 @@ angular
                 var paginator = new DBPaginator(db, query);
 
                 dfd.resolve(paginator);
+
+                return dfd.promise;
+            };
+
+            this.deleteArticle = function(article) {
+                var dfd = $q.defer();
+
+                $http
+                    .delete(couac.generateUrl('entrievcxvcxs/{idEntry}', {idEntry : article.id}))
+                    .then(null, function(){
+                        userActionManager.insertAction('delete', article.id);
+                    })
+                    .finally(function(){
+                        db.remove(article).then(dfd.resolve, dfd.reject);
+                    });
+
+                return dfd.promise;
+            };
+
+            this.markAsFavorite = function(article) {
+                var dfd = $q.defer();
+
+                article.is_starred = true;
+
+                $http
+                    .patch(couac.generateUrl('entriesfsdfds/{idEntry}', {idEntry : article.id}), article)
+                    .then(dfd.resolve(),function(){
+                        userActionManager.insertAction('update', article.id.toString());
+                    })
+                    .finally(function(){
+                        db.put(article).then(dfd.resolve, dfd.reject);
+                    });
+
+                return dfd.promise;
+            };
+
+            this.markAsRead = function(article) {
+                var dfd = $q.defer();
+
+                article.is_archived = true;
+
+                $http
+                    .patch(couac.generateUrl('entriesfsdfds/{idEntry}', {idEntry : article.id}), article)
+                    .then(dfd.resolve(),function(){
+                        userActionManager.insertAction('update', article.id.toString());
+                    })
+                    .finally(function(){
+                        db.put(article).then(dfd.resolve, dfd.reject);
+                    });
+
+                return dfd.promise;
+            };
+
+            //Synchronize articles with server
+            this.synchronize = function() {
+                var dfd = $q.defer();
+
+                this
+                    .synchronizeDeleted()
+                    .then(this.synchronizeUpdates, dfd.reject)
+                    .then(this.reloadDatas, dfd.reject)
+                    .finally(function() {
+                        $rootScope.$broadcast("articlesSynchronizationEnded");
+                        dfd.resolve();
+                    });
+
+                return dfd.promise;
+            };
+
+            this.synchronizeDeleted = function() {
+                var dfd = $q.defer();
+
+                userActionManager.getAction('delete').then(function(data){
+                    var actionsLeft = data.docs.length;
+                    if (actionsLeft == 0) {
+                        dfd.resolve();
+                    }
+                    data.docs.forEach(function(action) {
+                        db.get(action.content).then(function() {
+
+                        });
+                        $http
+                            .delete(couac.generateUrl('entries/{idEntry}', {idEntry : action.content}))
+                            .then(function(){
+                                userActionManager.deleteAction(action).then(
+                                    function() {
+                                        if (--actionsLeft == 0) {
+                                            dfd.resolve();
+                                        }
+                                    },
+                                    dfd.reject);
+                            }, dfd.reject)
+                    });
+                }, function(err){
+                    console.error(err);
+                    dfd.reject();
+                });
+
+                return dfd.promise;
+            }
+
+            this.synchronizeUpdates = function() {
+                var dfd = $q.defer();
+
+                function error(err){
+                    console.error(err);
+                    dfd.reject();
+                }
+
+                userActionManager.getAction('update').then(function(data){
+                    var actionsLeft = data.docs.length;
+                    if (actionsLeft == 0) {
+                        dfd.resolve();
+                    }
+                    data.docs.forEach(function(action) {
+                        db.get(action.content).then(function (article) {
+                            console.log(article);
+                            $http
+                                .patch(couac.generateUrl('entries/{idEntry}', {idEntry : action.content}), article)
+                                .then(function(){
+                                    userActionManager.deleteAction(action).finally(
+                                        function() {
+                                            if (--actionsLeft == 0) {
+                                                dfd.resolve();
+                                            }
+                                        });
+                                });
+                        })
+                    });
+                }, error);
+
+                return dfd.promise;
+            }
+
+            this.reinitDb = function() {
+                var dfd = $q.defer();
+
+                db
+                    .destroy()
+                    .then(initDb, dfd.reject)
+                    .then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            }
+
+            this.reloadDatas = function() {
+                var dfd = $q.defer();
+
+                userActionManager.reinitDb()
+                    .then(articleManager.reinitDb, dfd.reject)
+                    .then(loadServerArticles, dfd.reject)
+                    .then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            }
+        }]
+    )
+    .service('userActionManager',[
+        '$q',
+        'pouchDB',
+        function($q, pouchDB){
+            var db;
+            var userActionManager = this;
+
+            function initDb() {
+                var dfd = $q.defer();
+
+                db = pouchDB("actions");
+                db.createIndex({
+                    index: { name : 'action', fields : ['action'], ddoc: 'action'}
+                }).then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            }
+
+            initDb();
+
+            this.reinitDb = function() {
+                var dfd = $q.defer();
+
+                db
+                    .destroy()
+                    .then(initDb, dfd.reject)
+                    .then(dfd.resolve, dfd.promise);
+
+                return dfd.promise;
+            }
+
+            this.insertAction = function(action, content) {
+                var dfd = $q.defer();
+
+                db.post({
+                    action: action,
+                    content: content
+                }).then(function (response) {
+                    dfd.resolve();
+                }).catch(function (err) {
+                    dfd.reject()
+                });
+
+                return dfd.promise;
+            };
+
+            this.getAction = function(action) {
+                var dfd = $q.defer();
+
+                db.find({
+                    selector : {action: action},
+                }).then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            };
+
+            this.deleteAction = function(action) {
+                var dfd = $q.defer();
+
+                db
+                    .remove(action._id)
+                    .then(dfd.resolve, dfd.reject);
 
                 return dfd.promise;
             };

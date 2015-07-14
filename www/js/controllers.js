@@ -3,32 +3,18 @@
 angular
     .module('wallabag.controllers', [])
     .controller('abstractArticleCtrl', [
-        "$scope",
-        "$state",
-        "$ionicLoading",
-        "articleManager",
-        function($scope, $state, $ionicLoading, articleManager) {
-            $scope.synchronize = function() {
-                $ionicLoading.show({
-                    template: 'Loading...'
-                });
-
-                articleManager.synchronize().then(function(data) {
-                    $ionicLoading.hide();
-                    $state.go($state.current, {}, {reload: true});
-                });
-
-            }
-        }
+        function() {}
     ])
     .controller('articleListCtrl', [
         "$rootScope",
         "$scope",
         "$stateParams",
+        "$state",
+        "$ionicLoading",
         "articleManager",
         "title",
         "paginatorName",
-        function($rootScope, $scope, $stateParams, articleManager, title, paginatorName) {
+        function($rootScope, $scope, $stateParams, $state, $ionicLoading, articleManager, title, paginatorName) {
             var paginator, loading;
 
             $scope.title = title;
@@ -60,9 +46,20 @@ angular
                 article.delete = true;
                 articleManager.deleteArticle(article).then(function(){
                     $scope.articles.splice($scope.articles.indexOf(article), 1);
-                }, function(){
-                    article.delete = false;
+                    dfd.resolve();
                 });
+            }
+
+            $scope.synchronize = function() {
+                $ionicLoading.show({
+                    template: 'Loading...'
+                });
+
+                articleManager.synchronize().then(function(data) {
+                    $ionicLoading.hide();
+                    $state.go($state.current, {}, {reload: true});
+                });
+
             }
 
             $scope.hasMore = function() {
@@ -88,7 +85,7 @@ angular
                 $scope.tags = tags;
             }
 
-            tagManager.getTags(updateTags);
+            tagManager.getTags().then(updateTags);
 
             $scope.doRefresh = function() {
                 var reloadEnded = function(){
@@ -97,26 +94,38 @@ angular
                 tagManager.reloadTags().then(reloadEnded, reloadEnded);
             };
 
-            $rootScope.$on('tagsUpdated', function(event, tags){
-                updateTags(tags);
-            });
-
         }
     ])
     .controller('articleViewCtrl', [
         "$scope",
+        "$state",
         "$rootScope",
         "$stateParams",
         "articleManager",
-        function($scope, $rootScope, $stateParams, articleManager) {
+        function($scope, $state, $rootScope, $stateParams, articleManager) {
             var articleId = $stateParams.articleId;
-            var update = function(event, article) {
-                if (article.id == articleId) {
-                    $scope.article = article;
-                }
+            var update = function(article) {
+                $scope.article = article;
             }
 
-            $rootScope.$on('articleUpdated', update);
-            articleManager.getArticle(articleId);
+            $scope.deleteArticle = function() {
+                articleManager.deleteArticle($scope.article).then(function(){
+                    $state.go("article.unread", {}, {reload: true});
+                });
+            }
+
+            $scope.markAsRead = function() {
+                articleManager.markAsRead($scope.article).then(function(){
+                    $scope.article.is_archived = true;
+                });
+            }
+
+            $scope.markAsFavorite = function() {
+                articleManager.markAsFavorite($scope.article).then(function(){
+                    $scope.article.is_starred = true;
+                });
+            }
+
+            articleManager.getArticle(articleId).then(update);
         }
     ])

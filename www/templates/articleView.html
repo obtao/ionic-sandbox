@@ -2,17 +2,24 @@
     <ion-nav-buttons side="left">
         <button menu-toggle="left"class="button button-icon icon ion-navicon"></button>
     </ion-nav-buttons>
+    <ion-nav-buttons side="right">
+        <button class="button button-icon icon ion-checkmark-round" ng-if="article.is_archived == false" ng-click="markAsRead()"></button>
+        <button class="button button-icon icon" ng-class="article.is_starred?'ion-android-star':'ion-android-star-outline'" ng-click="markAsFavorite()"></button>
+        <button class="button button-icon icon ion-trash-b" ng-click="deleteArticle(article)"></button>
+    </ion-nav-buttons>
     <ion-content>
         <div class="list card">
             <div class="item">
                 <h2>{{ article.title }}</h2>
-                <p>{{ article.publishedAt }}</p>
+                <p>{{ article.created_at }}</p>
+                <p ng-if="article.tags.length > 0">
+                    <i class="icon ion-bookmark"></i>
+                    <span ng-repeat="(key, tag) in article.tags"> {{ tag.label }} <span ng-if="!$last">|</span>
+                    </span>
+                </p>
             </div>
             <div class="item item-body">
                 <div ng-bind-html="article.content | trustAsHtml"></div>
-                <p>
-                  <a class="subdued" ng-repeat="(key, tag) in article.tags"> {{ tag.label }} </a>
-                </p>
             </div>
         </div>
     </ion-content>
