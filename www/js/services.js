@@ -32,7 +32,10 @@ angular
             var db = pouchDB("tags");
             var tagManager = this;
 
-            function saveTags(tags) {
+            /**
+             * Persist tags from remote server in local db
+             */
+            function persistTags(tags) {
                 var dfd = $q.defer();
 
                 dbTags = [];
@@ -49,14 +52,16 @@ angular
                 return dfd.promise;
             };
 
-            //Load tags from a remote server
+            /**
+             * Load tags from remote server
+             */
             function loadTags() {
                 var dfd = $q.defer();
 
                 $http
                     .get(couac.generateUrl('tags'))
                     .success(function(tags) {
-                        saveTags(tags).then(dfd.resolve, dfd.reject);
+                        persistTags(tags).then(dfd.resolve, dfd.reject);
                     })
                     .error(function(data) {
                         dfd.reject(data);
@@ -65,7 +70,9 @@ angular
                 return dfd.promise;
             };
 
-            //Get tags from cache if any
+            /**
+             * Get Tags. (From cache if available)
+             */
             this.getTags = function() {
                 var dfd = $q.defer();
 
@@ -88,7 +95,9 @@ angular
                 return dfd.promise;
             };
 
-            // Force cache reload
+            /**
+             * Force reload from remote server
+             */
             this.reloadTags = function(){
                 var dfd = $q.defer();
 
@@ -116,16 +125,36 @@ angular
         'userActionManager',
         function($rootScope, $http, $q, couac, utils, pouchDB, DBPaginator, userActionManager){
             var db;
+            var indexes = [
+                { name : 'archived', fields : ['is_archived'], ddoc: 'archived'},
+                { name : 'id', fields : ['id'], ddoc: 'id'},
+                { name : 'starred', fields : ['is_starred'], ddoc: 'starred'},
+                { name : 'deleted', fields : ['_deleted'], ddoc: 'deleted'}
+            ];
+            var paginators = {
+                unreads : {
+                    selector : {
+                        'is_archived' : false
+                    }
+                },
+                archived : {
+                    selector : {
+                        'is_archived' : true
+                    }
+                },
+                starred : {
+                    selector : {
+                        'is_starred' : true
+                    }
+                }
+            };
             var articleManager = this;
 
+            /**
+             * Init Articles Database (Creates db and indexes)
+             */
             function initDb() {
                 var dfd = $q.defer();
-                var indexes = [
-                    { name : 'archived', fields : ['is_archived'], ddoc: 'archived'},
-                    { name : 'id', fields : ['id'], ddoc: 'id'},
-                    { name : 'starred', fields : ['is_starred'], ddoc: 'starred'},
-                    { name : 'deleted', fields : ['_deleted'], ddoc: 'deleted'}
-                ];
                 var indexesLeft = indexes.length;
                 db = pouchDB("articles");
 
@@ -144,7 +173,10 @@ angular
                 return dfd.promise;
             }
 
-            function saveServerArticles(articles) {
+            /**
+             * Persist server articles in local database
+             */
+            function persistServerArticles(articles) {
                 var dfd = $q.defer();
 
                 dbArticles = [];
@@ -167,7 +199,9 @@ angular
                 return dfd.promise;
             };
 
-            //Load articles from a remote server
+            /**
+             * Get all articles from remote server
+             */
             function loadServerArticles(page) {
                 var dfd = $q.defer();
                 page = (page && typeof page != "Object")?page:1;
@@ -175,7 +209,7 @@ angular
                 $http
                     .get(couac.generateUrl('entries', {perPage : 50, page : page}))
                     .success(function(data) {
-                        saveServerArticles(data['_embedded']['items']).then(function() {
+                        persistServerArticles(data['_embedded']['items']).then(function() {
                             if (page < data['pages']) {
                                 loadServerArticles(++page).then(dfd.resolve, dfd.reject);
                             } else {
@@ -191,8 +225,12 @@ angular
                 return dfd.promise;
             };
 
+            //Init db as soon as application starts
             initDb();
 
+            /**
+             * Get Article
+             */
             this.getArticle = function(articleId) {
                 var dfd = $q.defer()
 
@@ -203,70 +241,29 @@ angular
                 return dfd.promise;
             }
 
+            /**
+             * Get A paginator (defined in paginators variable)
+             */
             this.getPaginator = function(paginatorName) {
-                paginatorName = paginatorName.charAt(0).toUpperCase() + paginatorName.slice(1);
-                var methodName = "get" + paginatorName + "Paginator";
-                if (typeof this[methodName] != "function") {
+                if (typeof paginators[paginatorName] != "object") {
                     throw "The paginator " + paginatorName + " does not exist"
                 }
 
                 var dfd = $q.defer();
-
-                this[methodName]().then(dfd.resolve, dfd.reject);
-
-                return dfd.promise;
-            };
-
-            this.getUnreadsPaginator = function() {
-                var dfd = $q.defer();
-
-                var query = {
-                    selector : {
-                        'is_archived' : false
-                    }
-                };
-                var paginator = new DBPaginator(db, query);
-
+                var paginator = new DBPaginator(db, paginators[paginatorName]);
                 dfd.resolve(paginator);
 
                 return dfd.promise;
             };
 
-            this.getArchivedPaginator = function() {
-                var dfd = $q.defer();
-
-                var query = {
-                    selector : {
-                        'is_archived' : true
-                    }
-                };
-                var paginator = new DBPaginator(db, query);
-
-                dfd.resolve(paginator);
-
-                return dfd.promise;
-            };
-
-            this.getStarredPaginator = function() {
-                var dfd = $q.defer();
-
-                var query = {
-                    selector : {
-                        'is_starred' : true
-                    }
-                };
-                var paginator = new DBPaginator(db, query);
-
-                dfd.resolve(paginator);
-
-                return dfd.promise;
-            };
-
+            /**
+             * Delete an article. If network is unavailable, add action to stack
+             */
             this.deleteArticle = function(article) {
                 var dfd = $q.defer();
 
                 $http
-                    .delete(couac.generateUrl('entrievcxvcxs/{idEntry}', {idEntry : article.id}))
+                    .delete(couac.generateUrl('entries/{idEntry}', {idEntry : article.id}))
                     .then(null, function(){
                         userActionManager.insertAction('delete', article.id);
                     })
@@ -277,30 +274,38 @@ angular
                 return dfd.promise;
             };
 
+            /**
+             * Mark an article as favorite. If network is unavailable, add action to stack
+             */
             this.markAsFavorite = function(article) {
                 var dfd = $q.defer();
 
                 article.is_starred = true;
-
-                $http
-                    .patch(couac.generateUrl('entriesfsdfds/{idEntry}', {idEntry : article.id}), article)
-                    .then(dfd.resolve(),function(){
-                        userActionManager.insertAction('update', article.id.toString());
-                    })
-                    .finally(function(){
-                        db.put(article).then(dfd.resolve, dfd.reject);
-                    });
+                this.saveArticle(article).then(dfd.resolve, dfd.reject);
 
                 return dfd.promise;
             };
 
+            /**
+             * Mark an article as read. If network is unavailable, add action to stack
+             */
             this.markAsRead = function(article) {
                 var dfd = $q.defer();
 
                 article.is_archived = true;
+                this.saveArticle(article).then(dfd.resolve, dfd.reject);
+
+                return dfd.promise;
+            };
+
+            /**
+             * Update article on remote server. Add action to stack if network is unavailable
+             */
+            this.saveArticle = function(article) {
+                var dfd = $q.defer();
 
                 $http
-                    .patch(couac.generateUrl('entriesfsdfds/{idEntry}', {idEntry : article.id}), article)
+                    .patch(couac.generateUrl('entries/{idEntry}', {idEntry : article.id}), article)
                     .then(dfd.resolve(),function(){
                         userActionManager.insertAction('update', article.id.toString());
                     })
@@ -309,16 +314,23 @@ angular
                     });
 
                 return dfd.promise;
-            };
+            }
 
-            //Synchronize articles with server
+            /**
+             * Synchronize local database with remote server
+             */
             this.synchronize = function() {
                 var dfd = $q.defer();
 
+                function reject(err) {
+                    console.error(err);
+                    dfd.reject(err);
+                }
+
                 this
                     .synchronizeDeleted()
-                    .then(this.synchronizeUpdates, dfd.reject)
-                    .then(this.reloadDatas, dfd.reject)
+                    .then(this.synchronizeUpdates)
+                    .then(this.reloadDatas, reject)
                     .finally(function() {
                         $rootScope.$broadcast("articlesSynchronizationEnded");
                         dfd.resolve();
@@ -327,38 +339,44 @@ angular
                 return dfd.promise;
             };
 
+            /**
+             * Re-synchronize deleted articles. Pending deletion are sent to remote server
+             */
             this.synchronizeDeleted = function() {
                 var dfd = $q.defer();
+
+                function reject(err) {
+                    throw err;
+                    dfd.reject(err);
+                }
 
                 userActionManager.getAction('delete').then(function(data){
                     var actionsLeft = data.docs.length;
                     if (actionsLeft == 0) {
                         dfd.resolve();
                     }
-                    data.docs.forEach(function(action) {
-                        db.get(action.content).then(function() {
 
-                        });
+                    data.docs.forEach(function(action) {
                         $http
                             .delete(couac.generateUrl('entries/{idEntry}', {idEntry : action.content}))
-                            .then(function(){
-                                userActionManager.deleteAction(action).then(
+                            .finally(function(){
+                                userActionManager.deleteAction(action).finally(
                                     function() {
                                         if (--actionsLeft == 0) {
                                             dfd.resolve();
                                         }
                                     },
-                                    dfd.reject);
-                            }, dfd.reject)
+                                    reject);
+                            }, reject)
                     });
-                }, function(err){
-                    console.error(err);
-                    dfd.reject();
-                });
+                }, reject);
 
                 return dfd.promise;
             }
 
+            /**
+             * Re-synchronize patched articles. Pending updates are sent to remote server
+             */
             this.synchronizeUpdates = function() {
                 var dfd = $q.defer();
 
@@ -374,7 +392,6 @@ angular
                     }
                     data.docs.forEach(function(action) {
                         db.get(action.content).then(function (article) {
-                            console.log(article);
                             $http
                                 .patch(couac.generateUrl('entries/{idEntry}', {idEntry : action.content}), article)
                                 .then(function(){
@@ -392,6 +409,9 @@ angular
                 return dfd.promise;
             }
 
+            /**
+             * Destroy and reinit a database. Deletes all entries.
+             */
             this.reinitDb = function() {
                 var dfd = $q.defer();
 
@@ -403,13 +423,21 @@ angular
                 return dfd.promise;
             }
 
+            /**
+             * Reload remote server articles.
+             */
             this.reloadDatas = function() {
                 var dfd = $q.defer();
 
+                function reject(err){
+                    console.error(err);
+                    dfd.reject(err);
+                }
+
                 userActionManager.reinitDb()
-                    .then(articleManager.reinitDb, dfd.reject)
-                    .then(loadServerArticles, dfd.reject)
-                    .then(dfd.resolve, dfd.reject);
+                    .then(articleManager.reinitDb)
+                    .then(loadServerArticles)
+                    .then(dfd.resolve, reject);
 
                 return dfd.promise;
             }
@@ -422,6 +450,9 @@ angular
             var db;
             var userActionManager = this;
 
+            /**
+             * Init Action Database (Creates db and indexes)
+             */
             function initDb() {
                 var dfd = $q.defer();
 
@@ -435,6 +466,9 @@ angular
 
             initDb();
 
+            /**
+             * Destroy and reinit a database. Deletes all entries.
+             */
             this.reinitDb = function() {
                 var dfd = $q.defer();
 
@@ -446,6 +480,9 @@ angular
                 return dfd.promise;
             }
 
+            /**
+             * Creates a pending action
+             */
             this.insertAction = function(action, content) {
                 var dfd = $q.defer();
 
@@ -461,6 +498,9 @@ angular
                 return dfd.promise;
             };
 
+            /**
+             * Get an action
+             */
             this.getAction = function(action) {
                 var dfd = $q.defer();
 
@@ -471,6 +511,9 @@ angular
                 return dfd.promise;
             };
 
+            /**
+             * Remove an action
+             */
             this.deleteAction = function(action) {
                 var dfd = $q.defer();
 

@@ -1,14 +1,18 @@
 'use strict;'
 
 angular
-    .module('wallabag', ['ionic', 'wallabag.controllers', 'wallabag.services', 'wallabag.factories', 'couac', 'pouchdb', 'ngCordova'])
+    .module('wallabag', ['ionic', 'wallabag.controllers', 'wallabag.services', 'wallabag.factories', 'couac', 'pouchdb', 'ngCordova', 'angularMoment'])
 
     .run([
         '$ionicPlatform',
         '$http',
+        '$rootScope',
         'wsse',
-        function($ionicPlatform, $http, wsse) {
+        function($ionicPlatform, $http, $rootScope, wsse) {
             $ionicPlatform.ready(function() {});
+            $rootScope.user = {
+                username : AppSettings.username,
+            };
             var encryptedPassword = wsse.sha1(AppSettings.password + AppSettings.username + AppSettings.salt);
 
             $http.defaults.headers.common['x-wsse'] = function() {
@@ -17,6 +21,13 @@ angular
             $http.defaults.headers.common.Authorization = 'profile=UsernameToken';
         }
     ])
+
+
+    .constant('angularMomentConfig', {
+        preprocess: 'utc',
+        timezone: 'Europe/Berlin'
+    })
+
 
     .config(function($stateProvider, $urlRouterProvider) {
         $stateProvider

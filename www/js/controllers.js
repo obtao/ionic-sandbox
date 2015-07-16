@@ -20,7 +20,8 @@ angular
             $scope.title = title;
             $scope.articles = [];
             $scope.data = {
-                showDelete : false
+                showDelete : false,
+                showFavorite : false
             };
 
             $scope.loadMore = function() {
@@ -46,7 +47,6 @@ angular
                 article.delete = true;
                 articleManager.deleteArticle(article).then(function(){
                     $scope.articles.splice($scope.articles.indexOf(article), 1);
-                    dfd.resolve();
                 });
             }
 
@@ -101,9 +101,12 @@ angular
         "$state",
         "$rootScope",
         "$stateParams",
+        "$ionicHistory",
         "articleManager",
-        function($scope, $state, $rootScope, $stateParams, articleManager) {
+        function($scope, $state, $rootScope, $stateParams, $ionicHistory, articleManager) {
             var articleId = $stateParams.articleId;
+            $scope.backButtonTitle = $ionicHistory.backView()?$ionicHistory.backView().title:"Back";
+
             var update = function(article) {
                 $scope.article = article;
             }
@@ -124,6 +127,14 @@ angular
                 articleManager.markAsFavorite($scope.article).then(function(){
                     $scope.article.is_starred = true;
                 });
+            }
+
+            $scope.goBack = function() {
+                $ionicHistory.goBack();
+            }
+
+            $scope.hasHistory = function() {
+                return $ionicHistory.backView() !== null;
             }
 
             articleManager.getArticle(articleId).then(update);
