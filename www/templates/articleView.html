@@ -8,7 +8,7 @@
     </ion-nav-title>
     <ion-nav-buttons side="right">
         <button class="button button-icon icon ion-checkmark-round" ng-if="article.is_archived == false" ng-click="markAsRead()"></button>
-        <button class="button button-icon icon" ng-class="article.is_starred?'ion-android-star':'ion-android-star-outline'" ng-click="markAsFavorite()"></button>
+        <button class="button button-icon icon" ng-class="article.is_starred?'ion-android-star':'ion-android-star-outline'" ng-click="toggleFavorite()"></button>
         <button class="button button-icon icon ion-trash-b" ng-click="deleteArticle(article)"></button>
     </ion-nav-buttons>
     <ion-content>

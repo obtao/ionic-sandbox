@@ -112,9 +112,12 @@ angular
             }
 
             $scope.deleteArticle = function() {
-                articleManager.deleteArticle($scope.article).then(function(){
-                    $state.go("article.unread", {}, {reload: true});
-                });
+                articleManager
+                    .deleteArticle($scope.article).then(function(){
+                        $state.go("article.unread", {}, {reload: true});
+                    }, function() {
+                        console.error(arguments);
+                    });
             }
 
             $scope.markAsRead = function() {
@@ -123,10 +126,11 @@ angular
                 });
             }
 
-            $scope.markAsFavorite = function() {
-                articleManager.markAsFavorite($scope.article).then(function(){
-                    $scope.article.is_starred = true;
-                });
+            $scope.toggleFavorite = function() {
+                articleManager.markAsFavorite(
+                    $scope.article,
+                    !$scope.article.is_starred
+                );
             }
 
             $scope.goBack = function() {

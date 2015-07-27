@@ -268,7 +268,9 @@ angular
                         userActionManager.insertAction('delete', article.id);
                     })
                     .finally(function(){
-                        db.remove(article).then(dfd.resolve, dfd.reject);
+                        db.get(article._id).then(function(article) {
+                            return db.remove(article).then(dfd.resolve, dfd.reject);
+                        }, dfd.reject);
                     });
 
                 return dfd.promise;
@@ -277,10 +279,11 @@ angular
             /**
              * Mark an article as favorite. If network is unavailable, add action to stack
              */
-            this.markAsFavorite = function(article) {
+            this.markAsFavorite = function(article, asFavorite) {
+                asFavorite = (asFavorite?true:false);
                 var dfd = $q.defer();
 
-                article.is_starred = true;
+                article.is_starred = asFavorite;
                 this.saveArticle(article).then(dfd.resolve, dfd.reject);
 
                 return dfd.promise;
