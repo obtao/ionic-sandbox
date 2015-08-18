@@ -205,9 +205,11 @@ angular
             function loadServerArticles(page) {
                 var dfd = $q.defer();
                 page = (page && typeof page != "Object")?page:1;
+                var url = couac.generateUrl('entries', {perPage : 50, page : page});
+
 
                 $http
-                    .get(couac.generateUrl('entries', {perPage : 50, page : page}))
+                    .get(url)
                     .success(function(data) {
                         persistServerArticles(data['_embedded']['items']).then(function() {
                             if (page < data['pages']) {
@@ -218,7 +220,7 @@ angular
                         }, dfd.reject);
                     })
                     .error(function(err) {
-                        console.error("[ARTICLES] Load articles problem", err);
+                        console.error("[ARTICLES] Load articles problem " + url + " " + angular.toJson(arguments));
                         dfd.reject(err);
                     });
 
